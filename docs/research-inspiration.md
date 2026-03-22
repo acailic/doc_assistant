@@ -116,6 +116,81 @@ RAG -> retrieve first, generate second
 Lost in the Middle -> keep prompt context selective and high-signal
 ```
 
+## Emerging Research (2024-2025)
+
+These papers represent newer advances that could inform future iterations of the system.
+
+### 6. Scaling Retrieval Augmented Generation with RAG Fusion: Lessons from an Industry Deployment
+
+- Authors: Anonymous (under review)
+- Year: 2025
+- Source: https://arxiv.org/abs/2603.02153
+
+Why it matters here:
+- This paper evaluates RAG Fusion in a real production environment, providing empirical data on what actually works at scale.
+- It specifically examines the relationship between retrieval fusion and re-ranking.
+
+Concrete influence on this codebase:
+- validates that retrieval fusion increases raw recall
+- reveals that fusion gains are often neutralized after re-ranking
+- suggests investing in a strong single retriever may outperform fusion complexity
+
+Main insight:
+- fusion is not a free lunch; if re-ranking is already strong, fusion adds overhead without proportional benefit
+
+**See also:** [docs/research/rag-fusion.md](./research/rag-fusion.md)
+
+### 7. AttentionRetriever: Attention Layers are Secretly Long Document Retrievers
+
+- Authors: Anonymous
+- Year: 2025
+- Source: https://arxiv.org/abs/2602.12278
+
+Why it matters here:
+- Introduces a novel approach to long document retrieval using attention mechanisms directly.
+- Entity-based retrieval creates context-aware embeddings that could improve chunk matching.
+
+Concrete influence on this codebase:
+- suggests attention patterns can serve as retrieval signals
+- entity-aware chunking could improve semantic matching
+- potential future direction for handling long technical documents
+
+Main insight:
+- transformer attention layers contain implicit retrieval signals that can be extracted and used for passage ranking
+
+**See also:** [docs/research/attention-retriever.md](./research/attention-retriever.md)
+
+### 8. INTRA: Leveraging LLM Parametric Knowledge for Fact Checking without Retrieval
+
+- Authors: Anonymous
+- Year: 2025
+- Source: https://arxiv.org/abs/2603.05471
+
+Why it matters here:
+- Shows that LLMs can fact-check using internal representations without external retrieval.
+- This can complement retrieval-based systems for confidence estimation.
+
+Concrete influence on this codebase:
+- parametric knowledge can serve as a fallback when retrieval fails
+- internal model confidence can augment retrieval-based confidence scores
+- potential for hybrid: retrieve first, validate with parametric knowledge
+
+Main insight:
+- retrieval is not always necessary; LLM internal knowledge can validate claims when retrieval returns weak results
+
+**See also:** [docs/research/fact-checking-intra.md](./research/fact-checking-intra.md)
+
+## Future Research Directions
+
+Papers queued for future exploration:
+
+- **SciMDR** - Multi-document retrieval for scientific literature
+- **Neural Debugger** - Using LLMs to debug retrieval pipelines
+- **CXReasonAgent** - Reasoning agents for complex queries
+- **Document Navigation** - Long-document navigation strategies
+- **Compact World Models** - Efficient knowledge compression
+- **MSSR Memory** - Memory systems for sustained retrieval
+
 ## Summary
 
 The project does not try to reproduce any one paper exactly. Instead, it combines:
@@ -123,3 +198,6 @@ The project does not try to reproduce any one paper exactly. Instead, it combine
 - DPR-style dense retrieval for passage selection
 - SBERT/MiniLM-style efficient embeddings for local search
 - long-context caution from recent LLM research to keep prompts selective
+- RAG Fusion lessons about retrieval vs. re-ranking trade-offs
+- attention-based retrieval insights for long documents
+- parametric knowledge as fallback validation
