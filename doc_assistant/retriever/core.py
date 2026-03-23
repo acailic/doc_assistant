@@ -27,12 +27,8 @@ class Retriever:
         Returns:
             List of Chunk objects sorted by relevance
         """
-        # Search in ChromaDB - ChromaDB auto-embeds query with default function
-        results = self.index_manager.collection.query(
-            query_texts=[query],
-            n_results=top_k,
-            include=["documents", "metadatas", "distances"],
-        )
+        # Query through IndexManager interface (not directly accessing collection)
+        results = self.index_manager.query(query, n_results=top_k)
 
         # Convert to Chunk objects
         chunks = []

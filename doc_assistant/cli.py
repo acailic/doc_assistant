@@ -1,5 +1,6 @@
 """CLI interface for documentation assistant."""
 
+import logging
 from pathlib import Path
 
 import click
@@ -32,6 +33,10 @@ def index(docs: str, persist_dir: str, chunk_size: int, overlap: int, verbose: b
     By default, performs incremental indexing - only re-indexing changed files.
     Use --force to perform a full re-index.
     """
+    # IMP-4: Configure logging when verbose mode is enabled
+    if verbose:
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
     if overlap >= chunk_size:
         click.echo("❌ Error: overlap must be less than chunk-size", err=True)
         raise SystemExit(1)
@@ -94,11 +99,12 @@ def index(docs: str, persist_dir: str, chunk_size: int, overlap: int, verbose: b
                 new_count += 1
                 total_new_chunks += len(chunks)
             elif indexed_hash != content_hash:
-                # Changed file
+                # Changed file - IMP-1: Use remove + add instead of upsert to handle shrinking files
                 if verbose:
                     click.echo(f"  Updated: {doc.source.name}")
+                manager.remove_source(source_str)
                 chunks = chunker.chunk(doc)
-                manager.upsert_chunks(chunks)
+                manager.add_chunks(chunks)
                 updated_count += 1
                 total_updated_chunks += len(chunks)
             else:
@@ -127,8 +133,9 @@ def index(docs: str, persist_dir: str, chunk_size: int, overlap: int, verbose: b
 @cli.command()
 @click.option("--persist-dir", "-p", default=".data/doc_assistant", help="Directory where index is stored")
 @click.option("--top-k", default=5, help="Number of chunks to retrieve")
+@click.option("--model", "-m", default="claude-sonnet-4-20250514", help="Claude model to use")
 @click.argument("question")
-def query(persist_dir: str, top_k: int, question: str) -> None:
+def query(persist_dir: str, top_k: int, model: str, question: str) -> None:
     """Query the documentation with a question."""
     persist_path = Path(persist_dir)
 
@@ -139,7 +146,7 @@ def query(persist_dir: str, top_k: int, question: str) -> None:
     # Initialize components
     manager = IndexManager(persist_dir=persist_path)
     retriever = Retriever(index_manager=manager)
-    generator = AnswerGenerator()
+    generator = AnswerGenerator(model=model)
 
     click.echo(f"\n❓ Question: {question}\n")
 
@@ -151,7 +158,7 @@ def query(persist_dir: str, top_k: int, question: str) -> None:
         return
 
     # Generate answer
-    answer = generator.generate(question, chunks)
+    answer = generator.generate(question, chunks, history=None)
 
     click.echo(f"💡 Answer:\n{answer.content}\n")
     click.echo(f"📊 Confidence: {answer.confidence:.0%}")
@@ -162,11 +169,16 @@ def query(persist_dir: str, top_k: int, question: str) -> None:
             click.echo(f"  • {source.name}")
 
 
+# Maximum number of conversation exchanges to keep in history
+MAX_HISTORY_LENGTH = 5
+
+
 @cli.command()
 @click.option("--persist-dir", "-p", default=".data/doc_assistant", help="Directory where index is stored")
 @click.option("--top-k", default=5, help="Number of chunks to retrieve")
-def chat(persist_dir: str, top_k: int) -> None:
-    """Start an interactive chat session."""
+@click.option("--model", "-m", default="claude-sonnet-4-20250514", help="Claude model to use")
+def chat(persist_dir: str, top_k: int, model: str) -> None:
+    """Start an interactive chat session with conversation history."""
     persist_path = Path(persist_dir)
 
     if not persist_path.exists():
@@ -176,9 +188,12 @@ def chat(persist_dir: str, top_k: int) -> None:
     # Initialize components
     manager = IndexManager(persist_dir=persist_path)
     retriever = Retriever(index_manager=manager)
-    generator = AnswerGenerator()
+    generator = AnswerGenerator(model=model)
 
     click.echo("💬 Interactive chat (type 'exit' to quit)\n")
+
+    # ARCH-2: Conversation history - list of (question, answer) tuples
+    history: list[tuple[str, str]] = []
 
     while True:
         try:
@@ -190,13 +205,25 @@ def chat(persist_dir: str, top_k: int) -> None:
 
             # Retrieve and answer
             chunks = retriever.retrieve(question, top_k=top_k)
-            answer = generator.generate(question, chunks)
+
+            # IMP-2: Provide feedback when no relevant chunks are found
+            if not chunks:
+                click.echo("\nNo relevant documentation found.\n")
+                continue
+
+            # Pass history to generator for multi-turn context
+            answer = generator.generate(question, chunks, history=history if history else None)
 
             click.echo(f"\n💡 {answer.content}\n")
             click.echo(f"📊 Confidence: {answer.confidence:.0%}")
 
             if answer.sources:
                 click.echo(f"📖 Sources: {', '.join(s.name for s in answer.sources)}\n")
+
+            # Add to history, keeping only last MAX_HISTORY_LENGTH exchanges
+            history.append((question, answer.content))
+            if len(history) > MAX_HISTORY_LENGTH:
+                history = history[-MAX_HISTORY_LENGTH:]
 
         except KeyboardInterrupt:
             click.echo("\nGoodbye!")
@@ -206,7 +233,7 @@ def chat(persist_dir: str, top_k: int) -> None:
 @cli.command()
 @click.option("--persist-dir", "-p", default=".data/doc_assistant", help="Directory where index is stored")
 def stats(persist_dir: str) -> None:
-    """Show statistics about the indexed documentation."""
+    """Show comprehensive statistics about the indexed documentation."""
     persist_path = Path(persist_dir)
 
     if not persist_path.exists():
@@ -214,11 +241,31 @@ def stats(persist_dir: str) -> None:
         raise SystemExit(1)
 
     manager = IndexManager(persist_dir=persist_path)
-    count = manager.count()
+    stats = manager.get_stats()
 
     click.echo("\n📊 Index Statistics:")
-    click.echo(f"  Chunks indexed: {count}")
+    click.echo(f"  Chunks indexed: {stats['chunk_count']}")
+    click.echo(f"  Sources indexed: {len(stats['sources'])}")
+    click.echo(f"  Total size: {_format_size(stats['total_size_bytes'])}")
+    click.echo(f"  Last modified: {stats['last_modified'] or 'N/A'}")
+    click.echo(f"  Embedding model: {stats['embedding_model']}")
     click.echo(f"  Index location: {persist_path}")
+
+    if stats["sources"]:
+        click.echo("\n📁 Indexed files:")
+        for source in stats["sources"][:10]:  # Show first 10
+            click.echo(f"  • {Path(source).name}")
+        if len(stats["sources"]) > 10:
+            click.echo(f"  ... and {len(stats['sources']) - 10} more")
+
+
+def _format_size(size_bytes: int) -> str:
+    """Format size in human-readable format."""
+    for unit in ["B", "KB", "MB", "GB"]:
+        if size_bytes < 1024:
+            return f"{size_bytes:.1f} {unit}"
+        size_bytes /= 1024
+    return f"{size_bytes:.1f} TB"
 
 
 if __name__ == "__main__":

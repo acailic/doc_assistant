@@ -139,3 +139,61 @@ def test_chunker_python_file_no_header_metadata():
     # Should not have markdown header metadata
     assert not any(c.metadata.get("h1") for c in chunks)
     assert not any(c.metadata.get("section_path") for c in chunks)
+
+
+def test_chunker_chunk_all_multiple_documents():
+    """Test that chunk_all processes multiple documents."""
+    chunker = TextChunker(chunk_size=100, overlap=20)
+
+    docs = [
+        Document(
+            source=Path("doc1.txt"),
+            content="First document content with enough text to split.",
+            metadata={"format": "txt"},
+        ),
+        Document(
+            source=Path("doc2.txt"),
+            content="Second document content with enough text to split.",
+            metadata={"format": "txt"},
+        ),
+        Document(
+            source=Path("doc3.md"),
+            content="# Header\n\nContent for third document.",
+            metadata={"format": "md"},
+        ),
+    ]
+
+    all_chunks = chunker.chunk_all(docs)
+
+    # Should produce chunks from all documents
+    sources = {str(c.source) for c in all_chunks}
+    assert "doc1.txt" in sources
+    assert "doc2.txt" in sources
+    assert "doc3.md" in sources
+
+
+def test_chunker_chunk_all_empty_list():
+    """Test that chunk_all handles empty list."""
+    chunker = TextChunker(chunk_size=100, overlap=20)
+
+    all_chunks = chunker.chunk_all([])
+
+    assert all_chunks == []
+
+
+def test_chunker_chunk_all_preserves_order():
+    """Test that chunk_all preserves document order."""
+    chunker = TextChunker(chunk_size=1000, overlap=200)
+
+    docs = [
+        Document(source=Path("first.txt"), content="First", metadata={"format": "txt"}),
+        Document(source=Path("second.txt"), content="Second", metadata={"format": "txt"}),
+        Document(source=Path("third.txt"), content="Third", metadata={"format": "txt"}),
+    ]
+
+    all_chunks = chunker.chunk_all(docs)
+
+    # Chunks should come in document order
+    assert all_chunks[0].source == Path("first.txt")
+    assert all_chunks[1].source == Path("second.txt")
+    assert all_chunks[2].source == Path("third.txt")

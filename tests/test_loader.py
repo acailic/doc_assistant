@@ -76,3 +76,40 @@ def test_loader_content_hash_is_deterministic():
 
     for d1, d2 in zip(docs1, docs2, strict=True):
         assert d1.metadata["content_hash"] == d2.metadata["content_hash"]
+
+
+def test_loader_handles_pdf_files():
+    """Test that loader extracts text from PDF files."""
+    import pytest
+
+    try:
+        import fitz  # PyMuPDF
+    except ImportError:
+        pytest.skip("PyMuPDF not installed")
+
+    # Create a simple PDF for testing
+    pdf_path = FIXTURES_DIR / "test.pdf"
+
+    # Create a simple PDF with text content
+    doc = fitz.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Test PDF Content")
+    doc.save(str(pdf_path))
+    doc.close()
+
+    try:
+        loader = DocumentLoader(FIXTURES_DIR)
+        docs = list(loader.load())
+
+        pdf_docs = [d for d in docs if d.source.suffix == ".pdf"]
+        assert len(pdf_docs) >= 1
+        assert any("Test PDF Content" in d.content for d in pdf_docs)
+
+        # PDF docs should have metadata
+        for pdf_doc in pdf_docs:
+            assert pdf_doc.metadata.get("format") == "pdf"
+            assert "content_hash" in pdf_doc.metadata
+    finally:
+        # Clean up the created PDF
+        if pdf_path.exists():
+            pdf_path.unlink()

@@ -21,22 +21,28 @@ SUPPORTED_FORMATS = {
     ".json": "json",
     ".yaml": "yaml",
     ".yml": "yaml",
+    ".rst": "rst",
 }
+
+# Default maximum file size (10MB)
+DEFAULT_MAX_FILE_SIZE = 10 * 1024 * 1024
 
 
 class DocumentLoader:
     """Load and parse documents from a directory."""
 
-    def __init__(self, docs_dir: Path):
+    def __init__(self, docs_dir: Path, max_file_size: int = DEFAULT_MAX_FILE_SIZE):
         """Initialize loader with documents directory.
 
         Args:
             docs_dir: Path to directory containing documents
+            max_file_size: Maximum file size in bytes (default 10MB)
 
         Raises:
             FileNotFoundError: If docs_dir doesn't exist
         """
         self.docs_dir = Path(docs_dir)
+        self.max_file_size = max_file_size
         if not self.docs_dir.exists():
             raise FileNotFoundError(f"Directory not found: {self.docs_dir}")
 
@@ -67,7 +73,20 @@ class DocumentLoader:
                     yield file_path
 
     def _load_file(self, file_path: Path) -> str | None:
-        """Load content from a file based on its format."""
+        """Load content from a file based on its format.
+
+        Raises:
+            ValueError: If file exceeds max_file_size limit
+        """
+        # Check file size before loading
+        file_size = file_path.stat().st_size
+        if file_size > self.max_file_size:
+            max_mb = self.max_file_size / (1024 * 1024)
+            actual_mb = file_size / (1024 * 1024)
+            raise ValueError(
+                f"File {file_path.name} exceeds maximum size limit. Size: {actual_mb:.1f}MB, Limit: {max_mb:.0f}MB"
+            )
+
         suffix = file_path.suffix.lower()
 
         if suffix == ".pdf":
@@ -76,9 +95,19 @@ class DocumentLoader:
         return self._load_text(file_path)
 
     def _load_text(self, file_path: Path) -> str | None:
-        """Load text content from a file."""
+        """Load text content from a file with encoding detection.
+
+        Tries UTF-8 first, then falls back to latin-1 as a universal fallback.
+        """
+        # Try UTF-8 first (most common)
         try:
             return file_path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            pass
+
+        # Fall back to latin-1 (accepts any byte sequence)
+        try:
+            return file_path.read_text(encoding="latin-1")
         except Exception as e:
             logger.warning(f"Failed to load text file {file_path}: {e}")
             return None

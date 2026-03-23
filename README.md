@@ -208,6 +208,7 @@ Additional project documentation lives in [`docs/`](./docs/README.md):
 - [`docs/README.md`](./docs/README.md) - Documentation index
 - [`docs/architecture.md`](./docs/architecture.md) - System architecture
 - [`docs/implementation-process.md`](./docs/implementation-process.md) - How this was built
+- [`docs/learnings.md`](./docs/learnings.md) - Consolidated lessons learned
 - [`docs/research-inspiration.md`](./docs/research-inspiration.md) - Research and inspiration sources
 
 ## License
