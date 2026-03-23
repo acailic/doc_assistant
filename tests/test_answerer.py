@@ -3,38 +3,10 @@
 import os
 from pathlib import Path
 
-import anthropic
 import pytest
 
-from doc_assistant.answerer.core import MIN_RELEVANCE_THRESHOLD
-from doc_assistant.answerer.core import AnswerGenerator
+from doc_assistant.answerer.core import MIN_RELEVANCE_THRESHOLD, AnswerGenerator
 from doc_assistant.models import Chunk
-
-
-def _skip_if_no_api_key():
-    """Skip test if API key is not set or invalid."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        pytest.skip("ANTHROPIC_API_KEY not set")
-
-
-def _check_api_available():
-    """Check if API key is valid by making a minimal test call."""
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return False
-    try:
-        client = anthropic.Anthropic()
-        # Make minimal API call to verify key works
-        client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1,
-            messages=[{"role": "user", "content": "hi"}],
-        )
-        return True
-    except anthropic.AuthenticationError:
-        return False
-    except Exception:
-        # Other errors (rate limit, network) - assume key is valid
-        return True
 
 
 def test_answer_generator_low_score_returns_early():
@@ -117,12 +89,19 @@ def test_answer_generator_confidence_reflects_scores():
         ),
     ]
 
-    try:
-        answer = generator.generate("How do I configure authentication?", chunks)
-        # Confidence should be the average score (0.85 in this case)
-        assert 0.7 <= answer.confidence <= 1.0
-    except anthropic.AuthenticationError:
-        pytest.skip("ANTHROPIC_API_KEY is invalid")
+    answer = generator.generate("How do I configure authentication?", chunks)
+
+    # Check if the answer indicates auth failure (API catches errors internally)
+    if answer.confidence == 0.0 and (
+        "authentication" in answer.content.lower()
+        or "api key" in answer.content.lower()
+        or "failed to connect" in answer.content.lower()
+        or "api error" in answer.content.lower()
+    ):
+        pytest.skip("No valid API key available")
+
+    # Confidence should be the average score (0.85 in this case)
+    assert 0.7 <= answer.confidence <= 1.0
 
 
 @pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="ANTHROPIC_API_KEY not set")
@@ -139,13 +118,20 @@ def test_answer_generator_creates_answer():
         ),
     ]
 
-    try:
-        answer = generator.generate("How do I configure authentication?", chunks)
-        assert answer.content
-        assert len(answer.content) > 0
-        assert Path("auth.md") in answer.sources
-    except anthropic.AuthenticationError:
-        pytest.skip("ANTHROPIC_API_KEY is invalid")
+    answer = generator.generate("How do I configure authentication?", chunks)
+
+    # Check if the answer indicates auth failure (API catches errors internally)
+    if answer.confidence == 0.0 and (
+        "authentication" in answer.content.lower()
+        or "api key" in answer.content.lower()
+        or "failed to connect" in answer.content.lower()
+        or "api error" in answer.content.lower()
+    ):
+        pytest.skip("No valid API key available")
+
+    assert answer.content
+    assert len(answer.content) > 0
+    assert Path("auth.md") in answer.sources
 
 
 @pytest.mark.skipif(not os.environ.get("ANTHROPIC_API_KEY"), reason="ANTHROPIC_API_KEY not set")
@@ -168,8 +154,15 @@ def test_answer_generator_includes_sources():
         ),
     ]
 
-    try:
-        answer = generator.generate("What is the rate limit?", chunks)
-        assert len(answer.sources) >= 1
-    except anthropic.AuthenticationError:
-        pytest.skip("ANTHROPIC_API_KEY is invalid")
+    answer = generator.generate("What is the rate limit?", chunks)
+
+    # Check if the answer indicates auth failure (API catches errors internally)
+    if answer.confidence == 0.0 and (
+        "authentication" in answer.content.lower()
+        or "api key" in answer.content.lower()
+        or "failed to connect" in answer.content.lower()
+        or "api error" in answer.content.lower()
+    ):
+        pytest.skip("No valid API key available")
+
+    assert len(answer.sources) >= 1

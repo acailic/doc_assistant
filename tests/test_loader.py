@@ -74,5 +74,5 @@ def test_loader_content_hash_is_deterministic():
     docs1 = sorted(docs1, key=lambda d: str(d.source))
     docs2 = sorted(docs2, key=lambda d: str(d.source))
 
-    for d1, d2 in zip(docs1, docs2):
+    for d1, d2 in zip(docs1, docs2, strict=True):
         assert d1.metadata["content_hash"] == d2.metadata["content_hash"]

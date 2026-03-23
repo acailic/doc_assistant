@@ -5,8 +5,7 @@ from pathlib import Path
 
 import anthropic
 
-from ..models import Answer
-from ..models import Chunk
+from ..models import Answer, Chunk
 
 # Minimum average relevance score to attempt answer generation
 MIN_RELEVANCE_THRESHOLD = 0.3
@@ -52,7 +51,10 @@ class AnswerGenerator:
         """
         if not chunks:
             return Answer(
-                content="I don't have any relevant documentation to answer that question. Try indexing more documents or rephrasing your query.",
+                content=(
+                    "I don't have any relevant documentation to answer that question. "
+                    "Try indexing more documents or rephrasing your query."
+                ),
                 sources=[],
                 confidence=0.0,
             )
@@ -64,7 +66,10 @@ class AnswerGenerator:
         # Early return if relevance is too low
         if avg_score < MIN_RELEVANCE_THRESHOLD:
             return Answer(
-                content="I couldn't find sufficiently relevant documentation to answer that question. Try rephrasing your query or indexing more documents.",
+                content=(
+                    "I couldn't find sufficiently relevant documentation to answer that question. "
+                    "Try rephrasing your query or indexing more documents."
+                ),
                 sources=[],
                 confidence=avg_score,
             )
@@ -75,7 +80,10 @@ class AnswerGenerator:
         # If all chunks are filtered out, return low confidence
         if not good_chunks:
             return Answer(
-                content="The available documentation doesn't seem directly relevant to your question. Try a more specific query.",
+                content=(
+                    "The available documentation doesn't seem directly relevant to your question. "
+                    "Try a more specific query."
+                ),
                 sources=[],
                 confidence=avg_score,
             )

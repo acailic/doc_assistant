@@ -2,9 +2,7 @@
 
 from pathlib import Path
 
-from doc_assistant.models import Answer
-from doc_assistant.models import Chunk
-from doc_assistant.models import Document
+from doc_assistant.models import Answer, Chunk, Document
 
 
 def test_document_model():

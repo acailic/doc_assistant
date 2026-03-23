@@ -89,10 +89,9 @@ class DocumentLoader:
             import fitz  # PyMuPDF
 
             text_parts = []
-            doc = fitz.open(file_path)
-            for page in doc:
-                text_parts.append(page.get_text())
-            doc.close()
+            with fitz.open(file_path) as doc:
+                for page in doc:
+                    text_parts.append(page.get_text())
             return "\n\n".join(text_parts)
         except Exception as e:
             logger.warning(f"Failed to load PDF file {file_path}: {e}")

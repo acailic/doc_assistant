@@ -2,11 +2,9 @@
 
 from collections.abc import Sequence
 
-from langchain_text_splitters import MarkdownHeaderTextSplitter
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import MarkdownHeaderTextSplitter, RecursiveCharacterTextSplitter
 
-from ..models import Chunk
-from ..models import Document
+from ..models import Chunk, Document
 
 
 class TextChunker:

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import click
 
+from . import __version__
 from .answerer.core import AnswerGenerator
 from .chunker.core import TextChunker
 from .indexer.core import IndexManager
@@ -12,7 +13,7 @@ from .retriever.core import Retriever
 
 
 @click.group()
-@click.version_option(version="0.1.0", prog_name="doc-assistant")
+@click.version_option(version=__version__, prog_name="doc-assistant")
 def cli() -> None:
     """Internal Developer Docs Assistant - Query your documentation in natural language."""
     pass
@@ -21,8 +22,8 @@ def cli() -> None:
 @cli.command()
 @click.option("--docs", "-d", required=True, type=click.Path(exists=True), help="Directory containing documentation")
 @click.option("--persist-dir", "-p", default=".data/doc_assistant", help="Directory to store index")
-@click.option("--chunk-size", default=1000, help="Chunk size in characters")
-@click.option("--overlap", default=200, help="Chunk overlap in characters")
+@click.option("--chunk-size", default=1000, type=click.IntRange(min=50), help="Chunk size in characters (min 50)")
+@click.option("--overlap", default=200, type=click.IntRange(min=0), help="Chunk overlap in characters (min 0)")
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--force", "-f", is_flag=True, help="Force full re-index (ignore existing index)")
 def index(docs: str, persist_dir: str, chunk_size: int, overlap: int, verbose: bool, force: bool) -> None:
@@ -31,6 +32,10 @@ def index(docs: str, persist_dir: str, chunk_size: int, overlap: int, verbose: b
     By default, performs incremental indexing - only re-indexing changed files.
     Use --force to perform a full re-index.
     """
+    if overlap >= chunk_size:
+        click.echo("❌ Error: overlap must be less than chunk-size", err=True)
+        raise SystemExit(1)
+
     docs_path = Path(docs)
     persist_path = Path(persist_dir)
 
@@ -46,7 +51,6 @@ def index(docs: str, persist_dir: str, chunk_size: int, overlap: int, verbose: b
         if verbose:
             click.echo("  Force flag set - performing full re-index")
         manager.clear()
-        force = True  # Already true, but keep for clarity
 
     # Load all current documents
     all_docs = list(loader.load())
@@ -111,7 +115,7 @@ def index(docs: str, persist_dir: str, chunk_size: int, overlap: int, verbose: b
                 removed_count += 1
 
         # Report results
-        click.echo(f"\n✅ Index updated:")
+        click.echo("\n✅ Index updated:")
         click.echo(f"   {new_count} new ({total_new_chunks} chunks)")
         click.echo(f"   {updated_count} updated ({total_updated_chunks} chunks)")
         click.echo(f"   {unchanged_count} unchanged")
@@ -121,11 +125,10 @@ def index(docs: str, persist_dir: str, chunk_size: int, overlap: int, verbose: b
 
 
 @cli.command()
-@click.option("--docs", "-d", required=True, type=click.Path(exists=True), help="Directory containing documentation")
 @click.option("--persist-dir", "-p", default=".data/doc_assistant", help="Directory where index is stored")
 @click.option("--top-k", default=5, help="Number of chunks to retrieve")
 @click.argument("question")
-def query(docs: str, persist_dir: str, top_k: int, question: str) -> None:
+def query(persist_dir: str, top_k: int, question: str) -> None:
     """Query the documentation with a question."""
     persist_path = Path(persist_dir)
 
@@ -160,10 +163,9 @@ def query(docs: str, persist_dir: str, top_k: int, question: str) -> None:
 
 
 @cli.command()
-@click.option("--docs", "-d", required=True, type=click.Path(exists=True), help="Directory containing documentation")
 @click.option("--persist-dir", "-p", default=".data/doc_assistant", help="Directory where index is stored")
 @click.option("--top-k", default=5, help="Number of chunks to retrieve")
-def chat(docs: str, persist_dir: str, top_k: int) -> None:
+def chat(persist_dir: str, top_k: int) -> None:
     """Start an interactive chat session."""
     persist_path = Path(persist_dir)
 

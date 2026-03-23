@@ -3,8 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
-
 from doc_assistant.indexer.core import IndexManager
 from doc_assistant.models import Chunk
 
